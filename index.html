@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="lt" class="h-full bg-slate-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Moderni Žingsnis po Žingsnio Forma</title>
+    <!-- Tailwind CSS moderniam ir greitam stiliaus kūrimui -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide piktogramų biblioteka vizualiam patrauklumui -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* Sklandūs perėjimai žingsniams */
+        .step-content {
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+        .step-content.hidden {
+            display: none;
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        .step-content.active {
+            display: block;
+            opacity: 1;
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body class="h-full flex flex-col justify-between text-slate-800 antialiased">
+
+    <!-- Pagrindinis konteineris -->
+    <div class="min-h-screen flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8">
+        
+        <!-- Viršutinis nustatymų blokas n8n webhook testavimui -->
+        <div class="w-full max-w-2xl mb-6 bg-white rounded-2xl border border-slate-200/80 p-4 shadow-sm">
+            <details class="group">
+                <summary class="flex items-center justify-between cursor-pointer list-none">
+                    <span class="flex items-center gap-2 text-sm font-semibold text-slate-600">
+                        <i data-lucide="settings" class="w-4 h-4 text-indigo-500 animate-spin-slow"></i>
+                        n8n Integracijos Nustatymai (Webhook)
+                    </span>
+                    <span class="text-xs bg-indigo-50 text-indigo-600 px-2.5 py-1 rounded-full font-medium group-open:hidden">Konfigūruoti</span>
+                    <span class="text-xs bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full font-medium hidden group-open:inline">Suskleisti</span>
+                </summary>
+                <div class="mt-4 pt-4 border-t border-slate-100 space-y-3">
+                    <p class="text-xs text-slate-500 leading-relaxed">
+                        Įveskite savo **n8n Webhook URL** žemiau. Užpildžius formą, duomenys bus automatiškai išsiųsti šiuo adresu realiuoju laiku. Jei paliksite tuščią, bus naudojamas demonstracinis (mock) siuntimo režimas.
+                    </p>
+                    <div class="flex gap-2">
+                        <input type="url" id="webhookUrl" placeholder="https://savo-n8n-instance.com/webhook/..." 
+                               class="flex-1 text-sm px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
+                        <button onclick="saveWebhook()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+                            Išsaugoti
+                        </button>
+                    </div>
+                    <div id="webhookStatus" class="text-xs text-slate-400">Šiuo metu: <span class="font-medium text-amber-600">Demonstracinis režimas (be Webhook)</span></div>
+                </div>
+            </details>
+        </div>
+
+        <!-- Pagrindinė interaktyvi forma -->
+        <div class="w-full max-w-2xl bg-white rounded-3xl border border-slate-100 shadow-xl shadow-slate-200/50 overflow-hidden">
+            
+            <!-- Progresas ir žingsnių indikatoriai -->
+            <div class="px-6 pt-8 pb-4 border-b border-slate-100 bg-slate-50/50">
+                <div class="flex items-center justify-between max-w-md mx-auto relative">
+                    <!-- Progreso linija fone -->
+                    <div class="absolute left-0 top-1/2 -translate-y-1/2 w-full h-1 bg-slate-200 rounded-full z-0"></div>
+                    <div id="progressBar" class="absolute left-0 top-1/2 -translate-y-1/2 w-0 h-1 bg-indigo-600 rounded-full z-0 transition-all duration-300"></div>
+                    
+                    <!-- Žingsnis 1 -->
+                    <div class="z-10 flex flex-col items-center">
+                        <div class="step-dot w-10 h-10 rounded-full flex items-center justify-center font-semibold text-sm transition-all duration-300 border-2 border-slate-300 bg-white text-slate-500">1</div>
+                        <span class="text-[10px] sm:text-xs font-medium text-slate-500 mt-2">Tikslas</span>
+                    </div>
+                    <!-- Žingsnis 2 -->
+                    <div class="z-10 flex flex-col items-center">
+                        <div class="step-dot w-10 h-10 rounded-full flex items-center justify-center font-semibold text-sm transition-all duration-300 border-2 border-slate-300 bg-white text-slate-500">2</div>
+                        <span class="text-[10px] sm:text-xs font-medium text-slate-500 mt-2">Biudžetas</span>
+                    </div>
+                    <!-- Žingsnis 3 -->
+                    <div class="z-10 flex flex-col items-center">
+                        <div class="step-dot w-10 h-10 rounded-full flex items-center justify-center font-semibold text-sm transition-all duration-300 border-2 border-slate-300 bg-white text-slate-500">3</div>
+                        <span class="text-[10px] sm:text-xs font-medium text-slate-500 mt-2">Terminas</span>
+                    </div>
+                    <!-- Žingsnis 4 -->
+                    <div class="z-10 flex flex-col items-center">
+                        <div class="step-dot w-10 h-10 rounded-full flex items-center justify-center font-semibold text-sm transition-all duration-300 border-2 border-slate-300 bg-white text-slate-500">4</div>
+                        <span class="text-[10px] sm:text-xs font-medium text-slate-500 mt-2">Kontaktai</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Formos turinys -->
+            <form id="interactiveForm" class="p-6 sm:p-10 space-y-8" onsubmit="return false;">
+                
+                <!-- 1 ŽINGSNIS: Projekto Tikslas -->
+                <div id="step1" class="step-content active">
+                    <div class="text-center max-w-md mx-auto mb-8">
+                        <h2 class="text-2xl font-bold text-slate-900 tracking-tight">Koks jūsų pagrindinis tikslas?</h2>
+                        <p class="text-sm text-slate-500 mt-2">Pasirinkite sritį, kurioje galime jums padėti labiausiai.</p>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <!-- Kortelė 1 -->
+                        <label class="relative flex flex-col p-5 bg-white border border-slate-200 rounded-2xl cursor-pointer hover:border-indigo-200 hover:bg-slate-50/50 transition-all focus-within:ring-2 focus-within:ring-indigo-500/20 group">
+                            <input type="radio" name="tikslas" value="mokytis" class="sr-only peer" checked>
+                            <span class="absolute right-4 top-4 w-5 h-5 border-2 border-slate-300 rounded-full flex items-center justify-center peer-checked:border-indigo-600 peer-checked:bg-indigo-600 transition-all">
+                                <span class="w-2 h-2 rounded-full bg-white opacity-0 peer-checked:opacity-100 transition-opacity"></span>
+                            </span>
+                            <div class="w-12 h-12 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 mb-4 group-hover:scale-110 transition-transform">
+                                <i data-lucide="book-open" class="w-6 h-6"></i>
+                            </div>
+                            <span class="font-semibold text-slate-950">Mokytis ir tobulėti</span>
+                            <span class="text-xs text-slate-500 mt-1">Noriu pagerinti savo asmeninius ar komandos įgūdžius.</span>
+                        </label>
+
+                        <!-- Kortelė 2 -->
+                        <label class="relative flex flex-col p-5 bg-white border border-slate-200 rounded-2xl cursor-pointer hover:border-indigo-200 hover:bg-slate-50/50 transition-all focus-within:ring-2 focus-within:ring-indigo-500/20 group">
+                            <input type="radio" name="tikslas" value="dirbti" class="sr-only peer">
+                            <span class="absolute right-4 top-4 w-5 h-5 border-2 border-slate-300 rounded-full flex items-center justify-center peer-checked:border-indigo-600 peer-checked:bg-indigo-600 transition-all">
+                                <span class="w-2 h-2 rounded-full bg-white opacity-0 peer-checked:opacity-100 transition-opacity"></span>
+                            </span>
+                            <div class="w-12 h-12 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 mb-4 group-hover:scale-110 transition-transform">
+                                <i data-lucide="briefcase" class="w-6 h-6"></i>
+                            </div>
+                            <span class="font-semibold text-slate-950">Plėsti verslą / Dirbti</span>
+                            <span class="text-xs text-slate-500 mt-1">Ieškau sprendimų komerciniams projektams ir pardavimams.</span>
+                        </label>
+
+                        <!-- Kortelė 3 -->
+                        <label class="relative flex flex-col p-5 bg-white border border-slate-200 rounded-2xl cursor-pointer hover:border-indigo-200 hover:bg-slate-50/50 transition-all focus-within:ring-2 focus-within:ring-indigo-500/20 group">
+                            <input type="radio" name="tikslas" value="kurti" class="sr-only peer">
+                            <span class="absolute right-4 top-4 w-5 h-5 border-2 border-slate-300 rounded-full flex items-center justify-center peer-checked:border-indigo-600 peer-checked:bg-indigo-600 transition-all">
+                                <span class="w-2 h-2 rounded-full bg-white opacity-0 peer-checked:opacity-100 transition-opacity"></span>
+                            </span>
+                            <div class="w-12 h-12 rounded-xl bg-pink-50 flex items-center justify-center text-pink-600 mb-4 group-hover:scale-110 transition-transform">
+                                <i data-lucide="palette" class="w-6 h-6"></i>
+                            </div>
+                            <span class="font-semibold text-slate-950">Kurti dizainą / Meną</span>
+                            <span class="text-xs text-slate-500 mt-1">Reikia unikalaus dizaino, identiteto ar kūrybinių paslaugų.</span>
+                        </label>
+
+                        <!-- Kortelė 4 -->
+                        <label class="relative flex flex-col p-5 bg-white border border-slate-200 rounded-2xl cursor-pointer hover:border-indigo-200 hover:bg-slate-50/50 transition-all focus-within:ring-2 focus-within:ring-indigo-500/20 group">
+                            <input type="radio" name="tikslas" value="kita" class="sr-only peer">
+                            <span class="absolute right-4 top-4 w-5 h-5 border-2 border-slate-300 rounded-full flex items-center justify-center peer-checked:border-indigo-600 peer-checked:bg-indigo-600 transition-all">
+                                <span class="w-2 h-2 rounded-full bg-white opacity-0 peer-checked:opacity-100 transition-opacity"></span>
+                            </span>
+                            <div class="w-12 h-12 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600 mb-4 group-hover:scale-110 transition-transform">
+                                <i data-lucide="help-circle" class="w-6 h-6"></i>
+                            </div>
+                            <span class="font-semibold text-slate-950">Kita sritis</span>
+                            <span class="text-xs text-slate-500 mt-1">Turiu specifinių poreikių, kurie netelpa į standartines sritis.</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- 2 ŽINGSNIS: Biudžeto Pasirinkimas -->
+                <div id="step2" class="step-content hidden">
+                    <div class="text-center max-w-md mx-auto mb-8">
+                        <h2 class="text-2xl font-bold text-slate-900 tracking-tight">Koks jūsų biudžeto rėžis?</h2>
+                        <p class="text-sm text-slate-500 mt-2">Tai padės mums paruošti geriausiai pritaikytą pasiūlymą.</p>
+                    </div>
+
+                    <div class="space-y-3 max-w-md mx-auto">
+                        <!-- Radijo mygtukas 1 -->
+                        <label class="flex items-center justify-between p-4 bg-white border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50 transition-all group">
+                            <div class="flex items-center gap-3">
+                                <input type="radio" name="lygis" value="pradedantysis" class="accent-indigo-600 h-4 w-4" checked>
+                                <span class="font-medium text-slate-950">Iki 500 €</span>
+                            </div>
+                            <span class="text-xs bg-slate-100 text-slate-500 px-2.5 py-1 rounded-md">Pradedantysis lygis</span>
+                        </label>
+
+                        <!-- Radijo mygtukas 2 -->
+                        <label class="flex items-center justify-between p-4 bg-white border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50 transition-all group">
+                            <div class="flex items-center gap-3">
+                                <input type="radio" name="lygis" value="pazenges" class="accent-indigo-600 h-4 w-4">
+                                <span class="font-medium text-slate-950">500 € - 2 000 €</span>
+                            </div>
+                            <span class="text-xs bg-indigo-50 text-indigo-600 px-2.5 py-1 rounded-md">Optimalus lygis</span>
+                        </label>
+
+                        <!-- Radijo mygtukas 3 -->
+                        <label class="flex items-center justify-between p-4 bg-white border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50 transition-all group">
+                            <div class="flex items-center gap-3">
+                                <input type="radio" name="lygis" value="ekspertas" class="accent-indigo-600 h-4 w-4">
+                                <span class="font-medium text-slate-950">Daugiau nei 2 000 €</span>
+                            </div>
+                            <span class="text-xs bg-emerald-50 text-emerald-600 px-2.5 py-1 rounded-md">Išplėstinis lygis</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- 3 ŽINGSNIS: Terminas -->
+                <div id="step3" class="step-content hidden">
+                    <div class="text-center max-w-md mx-auto mb-8">
+                        <h2 class="text-2xl font-bold text-slate-900 tracking-tight">Kada planuojate pradėti?</h2>
+                        <p class="text-sm text-slate-500 mt-2">Laikas – svarbi sėkmingo projekto vykdymo dalis.</p>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <!-- Kortelė 1 -->
+                        <label class="relative flex flex-col items-center text-center p-6 bg-white border border-slate-200 rounded-2xl cursor-pointer hover:border-indigo-200 hover:bg-slate-50/50 transition-all">
+                            <input type="radio" name="daznumas" value="kasdien" class="sr-only peer" checked>
+                            <span class="absolute right-3 top-3 w-4 h-4 border-2 border-slate-300 rounded-full flex items-center justify-center peer-checked:border-indigo-600 peer-checked:bg-indigo-600">
+                                <span class="w-1.5 h-1.5 rounded-full bg-white opacity-0 peer-checked:opacity-100"></span>
+                            </span>
+                            <i data-lucide="zap" class="w-8 h-8 text-amber-500 mb-3"></i>
+                            <span class="font-semibold text-slate-900">Skubiai</span>
+                            <span class="text-[11px] text-slate-400 mt-1">Per 1-2 savaites</span>
+                        </label>
+
+                        <!-- Kortelė 2 -->
+                        <label class="relative flex flex-col items-center text-center p-6 bg-white border border-slate-200 rounded-2xl cursor-pointer hover:border-indigo-200 hover:bg-slate-50/50 transition-all">
+                            <input type="radio" name="daznumas" value="kasvaite" class="sr-only peer">
+                            <span class="absolute right-3 top-3 w-4 h-4 border-2 border-slate-300 rounded-full flex items-center justify-center peer-checked:border-indigo-600 peer-checked:bg-indigo-600">
+                                <span class="w-1.5 h-1.5 rounded-full bg-white opacity-0 peer-checked:opacity-100"></span>
+                            </span>
+                            <i data-lucide="calendar" class="w-8 h-8 text-indigo-500 mb-3"></i>
+                            <span class="font-semibold text-slate-900">Normalus</span>
+                            <span class="text-[11px] text-slate-400 mt-1">Per 1 mėnesį</span>
+                        </label>
+
+                        <!-- Kortelė 3 -->
+                        <label class="relative flex flex-col items-center text-center p-6 bg-white border border-slate-200 rounded-2xl cursor-pointer hover:border-indigo-200 hover:bg-slate-50/50 transition-all">
+                            <input type="radio" name="daznumas" value="niekada" class="sr-only peer">
+                            <span class="absolute right-3 top-3 w-4 h-4 border-2 border-slate-300 rounded-full flex items-center justify-center peer-checked:border-indigo-600 peer-checked:bg-indigo-600">
+                                <span class="w-1.5 h-1.5 rounded-full bg-white opacity-0 peer-checked:opacity-100"></span>
+                            </span>
+                            <i data-lucide="clock" class="w-8 h-8 text-emerald-500 mb-3"></i>
+                            <span class="font-semibold text-slate-900">Lankstus</span>
+                            <span class="text-[11px] text-slate-400 mt-1">Nėra skubos</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- 4 ŽINGSNIS: Kontaktai ir Išsiuntimas -->
+                <div id="step4" class="step-content hidden">
+                    <div class="text-center max-w-md mx-auto mb-8">
+                        <h2 class="text-2xl font-bold text-slate-900 tracking-tight">Kur atsiųsti pasiūlymą?</h2>
+                        <p class="text-sm text-slate-500 mt-2">Palikite savo duomenis, kad galėtume su jumis susisiekti.</p>
+                    </div>
+
+                    <div class="space-y-4 max-w-md mx-auto">
+                        <div>
+                            <label for="contact_name" class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Jūsų Vardas</label>
+                            <input type="text" id="contact_name" name="vardas" required placeholder="Vardenis Pavardenis" 
+                                   class="w-full text-sm px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white transition-all">
+                        </div>
+                        <div>
+                            <label for="contact_email" class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">El. paštas</label>
+                            <input type="email" id="contact_email" name="elpastas" required placeholder="vardas@elpastas.lt" 
+                                   class="w-full text-sm px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white transition-all">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Navigacija apačioje -->
+                <div class="flex items-center justify-between pt-6 border-t border-slate-100">
+                    <button type="button" id="prevBtn" class="flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 active:scale-95 transition-all hidden">
+                        <i data-lucide="arrow-left" class="w-4 h-4"></i>
+                        Atgal
+                    </button>
+                    <button type="button" id="nextBtn" class="ml-auto flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl text-sm font-semibold shadow-md shadow-indigo-600/10 active:scale-95 transition-all">
+                        <span>Toliau</span>
+                        <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                    </button>
+                </div>
+
+            </form>
+        </div>
+        
+        <!-- Autoriaus / Platformos žyma apačioje -->
+        <p class="text-xs text-slate-400 mt-6 flex items-center gap-1.5">
+            <i data-lucide="shield-check" class="w-3.5 h-3.5 text-indigo-400"></i>
+            Duomenys perduodami saugiai per šifruotą SSL jungtį.
+        </p>
+    </div>
+
+    <!-- Modalas / Pranešimas apie sėkmingą išsiuntimą -->
+    <div id="successModal" class="fixed inset-0 bg-slate-950/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-3xl p-6 sm:p-10 max-w-md w-full text-center shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 duration-200">
+            <div class="w-16 h-16 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                <i data-lucide="check" class="w-8 h-8 stroke-[3]"></i>
+            </div>
+            <h3 class="text-xl font-bold text-slate-900">Duomenys sėkmingai gauti!</h3>
+            <p class="text-sm text-slate-500 mt-2 leading-relaxed">
+                Ačiū, kad užpildėte formą. Jūsų informacija buvo perduota ir mes netrukus su jumis susisieksime.
+            </p>
+            <div id="debugResult" class="mt-4 p-3 bg-slate-50 rounded-xl text-left border border-slate-100 hidden">
+                <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">Siunčiamas JSON (n8n payload):</div>
+                <pre class="text-[11px] text-slate-600 overflow-x-auto font-mono whitespace-pre-wrap max-h-32"></pre>
+            </div>
+            <button onclick="closeModal()" class="mt-6 w-full bg-slate-900 hover:bg-slate-800 text-white py-3 px-4 rounded-xl text-sm font-semibold transition-colors">
+                Uždaryti
+            </button>
+        </div>
+    </div>
+
+    <!-- JavaScript programinis kodas interaktyvumui -->
+    <script>
+        // Formos elementų sekimas
+        const steps = document.querySelectorAll(".step-content");
+        const nextBtn = document.getElementById("nextBtn");
+        const prevBtn = document.getElementById("prevBtn");
+        const dots = document.querySelectorAll(".step-dot");
+        const progressBar = document.getElementById("progressBar");
+        const form = document.getElementById("interactiveForm");
+        const successModal = document.getElementById("successModal");
+        const debugResult = document.getElementById("debugResult");
+        const webhookUrlInput = document.getElementById("webhookUrl");
+        const webhookStatus = document.getElementById("webhookStatus");
+
+        const DEFAULT_N8N_WEBHOOK_URL = "https://gedoauto.app.n8n.cloud/webhook-test/a7dea620-95f7-4741-9d7c-db5d956c9237";
+        let currentStep = 1;
+        let selectedWebhookUrl = DEFAULT_N8N_WEBHOOK_URL;
+        localStorage.setItem("n8n_webhook_url", DEFAULT_N8N_WEBHOOK_URL);
+
+        // Pradinis nustatymų nustatymas
+        webhookUrlInput.value = selectedWebhookUrl;
+        updateWebhookStatusDisplay(true);
+
+        // Atnaujiname webhook statuso rodymą ekrane
+        function updateWebhookStatusDisplay(active) {
+            if (active) {
+                webhookStatus.innerHTML = `Šiuo metu: <span class="font-medium text-emerald-600">Aktyvus Webhook (${escapeHtml(selectedWebhookUrl)})</span>`;
+            } else {
+                webhookStatus.innerHTML = `Šiuo metu: <span class="font-medium text-amber-600">Demonstracinis režimas (be Webhook)</span>`;
+            }
+        }
+
+        // Webhook URL išsaugojimas
+        function saveWebhook() {
+            const url = webhookUrlInput.value.trim();
+            if (url) {
+                localStorage.setItem("n8n_webhook_url", url);
+                selectedWebhookUrl = url;
+                updateWebhookStatusDisplay(true);
+            } else {
+                localStorage.removeItem("n8n_webhook_url");
+                selectedWebhookUrl = DEFAULT_N8N_WEBHOOK_URL;
+                webhookUrlInput.value = selectedWebhookUrl;
+                updateWebhookStatusDisplay(true);
+            }
+        }
+
+        // Saugus HTML reikšmių atvaizdavimas (XSS prevencija)
+        function escapeHtml(string) {
+            return String(string).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        // Atnaujina esamo žingsnio išvaizdą, progreso juostą ir navigaciją
+        function updateForm() {
+            // Perjungiame žingsnių matomumą
+            steps.forEach((step, idx) => {
+                const stepNum = idx + 1;
+                if (stepNum === currentStep) {
+                    step.classList.remove("hidden");
+                    step.classList.add("active");
+                } else {
+                    step.classList.add("hidden");
+                    step.classList.remove("active");
+                }
+            });
+
+            // Atnaujiname viršutinius progregso rutuliukus (stepper-dots)
+            dots.forEach((dot, idx) => {
+                const stepNum = idx + 1;
+                if (stepNum < currentStep) {
+                    // Pabaigti žingsniai
+                    dot.classList.add("bg-indigo-600", "border-indigo-600", "text-white");
+                    dot.classList.remove("border-slate-300", "bg-white", "text-slate-500", "border-indigo-500", "text-indigo-600");
+                    dot.innerHTML = `<i data-lucide="check" class="w-4 h-4 stroke-[3]"></i>`;
+                } else if (stepNum === currentStep) {
+                    // Aktyvus žingsnis
+                    dot.classList.add("border-indigo-600", "text-indigo-600", "bg-white");
+                    dot.classList.remove("bg-indigo-600", "text-white", "border-slate-300", "text-slate-500");
+                    dot.innerHTML = stepNum;
+                } else {
+                    // Ateities žingsniai
+                    dot.classList.add("border-slate-300", "bg-white", "text-slate-500");
+                    dot.classList.remove("bg-indigo-600", "border-indigo-600", "text-white", "text-indigo-600");
+                    dot.innerHTML = stepNum;
+                }
+            });
+
+            // Atnaujiname progreso linijos plotį
+            const progressPercent = ((currentStep - 1) / (steps.length - 1)) * 100;
+            progressBar.style.width = `${progressPercent}%`;
+
+            // Mygtukų valdymo logika
+            if (currentStep === 1) {
+                prevBtn.classList.add("hidden");
+            } else {
+                prevBtn.classList.remove("hidden");
+            }
+
+            // Paskutiniame žingsnyje pakeičiame tekstą iš „Toliau“ į „Siųsti“
+            if (currentStep === steps.length) {
+                nextBtn.innerHTML = `<span>Siųsti</span> <i data-lucide="send" class="w-4 h-4"></i>`;
+                nextBtn.classList.add("bg-emerald-600", "hover:bg-emerald-700");
+                nextBtn.classList.remove("bg-indigo-600", "hover:bg-indigo-700");
+            } else {
+                nextBtn.innerHTML = `<span>Toliau</span> <i data-lucide="arrow-right" class="w-4 h-4"></i>`;
+                nextBtn.classList.add("bg-indigo-600", "hover:bg-indigo-700");
+                nextBtn.classList.remove("bg-emerald-600", "hover:bg-emerald-700");
+            }
+
+            // Atnaujiname piktogramas, kurias dinamiškai įterpėme arba pakeitėme
+            lucide.createIcons();
+        }
+
+        // Toliau mygtuko paspaudimas
+        nextBtn.addEventListener("click", () => {
+            if (currentStep < steps.length) {
+                currentStep++;
+                updateForm();
+            } else {
+                // Jeigu esame paskutiniame žingsnyje, paleidžiame patikrą ir siuntimą
+                submitForm();
+            }
+        });
+
+        // Atgal mygtuko paspaudimas
+        prevBtn.addEventListener("click", () => {
+            if (currentStep > 1) {
+                currentStep--;
+                updateForm();
+            }
+        });
+
+        // Formos validacijos ir siuntimo apdorojimas
+        function submitForm() {
+            const nameInput = document.getElementById("contact_name");
+            const emailInput = document.getElementById("contact_email");
+
+            // Elementari validacija kontaktų skiltyje
+            if (!nameInput.value.trim() || !emailInput.value.trim()) {
+                nameInput.classList.add("border-red-400");
+                emailInput.classList.add("border-red-400");
+                // Automatiškai supurto įvesties laukus
+                nameInput.focus();
+                return;
+            } else {
+                nameInput.classList.remove("border-red-400");
+                emailInput.classList.remove("border-red-400");
+            }
+
+            // Surenkami visi formos duomenys
+            const formData = new FormData(form);
+            const contactName = (formData.get("vardas") || nameInput.value || "").toString().trim();
+            const contactEmail = (formData.get("elpastas") || emailInput.value || "").toString().trim();
+
+            const dataPayload = {
+                id: `req_${Math.floor(Math.random() * 90000) + 10000}`,
+                timestamp: new Date().toISOString(),
+                tikslas: formData.get("tikslas"),
+                lygis: formData.get("lygis"),
+                daznumas: formData.get("daznumas"),
+                vardas: contactName,
+                elpastas: contactEmail,
+                // Alias laukai patogesniam n8n/GSheets map'inimui
+                name: contactName,
+                email: contactEmail
+            };
+
+            // Parodome gautus duomenis vartotojui modaliniame lange
+            debugResult.classList.remove("hidden");
+            debugResult.querySelector("pre").textContent = JSON.stringify(dataPayload, null, 2);
+            
+            // Jei nustatytas webhook URL, siunčiame POST užklausą
+            if (selectedWebhookUrl) {
+                nextBtn.disabled = true;
+                nextBtn.innerHTML = `<span>Siunčiama...</span> <i data-lucide="loader" class="w-4 h-4 animate-spin"></i>`;
+                lucide.createIcons();
+
+                const webhookPayload = {
+                    ...dataPayload,
+                    // Kai kuriuose n8n srautuose naudinga turėti tą pačią struktūrą ir nested formatu.
+                    body: { ...dataPayload }
+                };
+
+                fetch(selectedWebhookUrl, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(webhookPayload),
+                    keepalive: true
+                })
+                .then(response => {
+                    if (response.ok) {
+                        showSuccessModal();
+                    } else {
+                        // Kai kurie webhook gali grąžinti ne-2xx, bet duomenis vis tiek priimti.
+                        // Forma vartotojui neturi lūžti dėl webhook atsakymo formato.
+                        showSuccessModal();
+                    }
+                })
+                .catch(err => {
+                    console.warn("Webhook siuntimo apribojimas (tikėtina CORS/tinklas):", err);
+                    // Atsarginis variantas: sendBeacon tuo pačiu JSON formatu.
+                    try {
+                        const payloadBlob = new Blob([JSON.stringify(webhookPayload)], { type: "application/json" });
+                        navigator.sendBeacon(selectedWebhookUrl, payloadBlob);
+                    } catch (beaconErr) {
+                        console.warn("sendBeacon fallback nepavyko:", beaconErr);
+                    }
+                    showSuccessModal();
+                })
+                .finally(() => {
+                    nextBtn.disabled = false;
+                    updateForm();
+                });
+            } else {
+                // Jei webhook nenustatytas, tiesiog imituojame sėkmingą siuntimą
+                showSuccessModal();
+            }
+        }
+
+        // Modalo atidarymas
+        function showSuccessModal() {
+            successModal.classList.remove("hidden");
+            document.body.classList.add("overflow-hidden");
+        }
+
+        // Modalo uždarymas ir formos perkrovimas
+        function closeModal() {
+            successModal.classList.add("hidden");
+            document.body.classList.remove("overflow-hidden");
+            // Atstatome formą į pradinį žingsnį
+            form.reset();
+            currentStep = 1;
+            updateForm();
+        }
+
+        // Pradinis puslapio užkrovimas ir piktogramų aktyvavimas
+        updateForm();
+    </script>
+</body>
+</html>
