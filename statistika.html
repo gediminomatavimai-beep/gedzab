@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Forma - Statistika</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+    <div class="max-w-6xl mx-auto p-4 sm:p-6 lg:p-8">
+        <header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+            <div>
+                <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">Formos statistika</h1>
+                <p class="text-sm text-slate-500 mt-1">Duomenys užkraunami iš n8n webhook (Google Sheets šaltinis).</p>
+            </div>
+            <div class="flex gap-2">
+                <button id="refreshBtn" class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition-colors">
+                    Atnaujinti
+                </button>
+                <a href="./index.html" class="px-4 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-sm font-semibold transition-colors">
+                    Į formą
+                </a>
+            </div>
+        </header>
+
+        <details class="mb-4 bg-white border border-slate-200 rounded-2xl p-4">
+            <summary class="cursor-pointer text-sm font-semibold text-slate-700">n8n GET webhook nustatymai</summary>
+            <div class="mt-3 space-y-2">
+                <label for="webhookUrl" class="block text-xs font-semibold uppercase tracking-wide text-slate-500">Webhook URL</label>
+                <input id="webhookUrl" type="url" class="w-full text-sm px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
+                <p class="text-xs text-slate-500">
+                    Naudojamas <strong>Production</strong> URL (<code>/webhook/</code>). Workflow turi būti <strong>Active</strong>,
+                    o paskutiniame node – „Respond to Webhook“ su JSON masyvu iš Google Sheets.
+                    Webhook node įjunkite <strong>Allowed Origins: *</strong> (CORS).
+                </p>
+            </div>
+        </details>
+
+        <div id="statusBox" class="mb-6 text-sm px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-600">
+            Kraunami duomenys...
+        </div>
+
+        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div class="bg-white border border-slate-200 rounded-2xl p-4">
+                <div class="text-xs uppercase tracking-wide text-slate-500">Iš viso įrašų</div>
+                <div id="totalCount" class="mt-2 text-2xl font-bold text-slate-900">0</div>
+            </div>
+            <div class="bg-white border border-slate-200 rounded-2xl p-4">
+                <div class="text-xs uppercase tracking-wide text-slate-500">Unikalių tikslų</div>
+                <div id="uniqueTikslas" class="mt-2 text-2xl font-bold text-slate-900">0</div>
+            </div>
+            <div class="bg-white border border-slate-200 rounded-2xl p-4">
+                <div class="text-xs uppercase tracking-wide text-slate-500">Unikalių biudžetų</div>
+                <div id="uniqueLygis" class="mt-2 text-2xl font-bold text-slate-900">0</div>
+            </div>
+            <div class="bg-white border border-slate-200 rounded-2xl p-4">
+                <div class="text-xs uppercase tracking-wide text-slate-500">Paskutinis atnaujinimas</div>
+                <div id="lastUpdate" class="mt-2 text-sm font-semibold text-slate-900">-</div>
+            </div>
+        </section>
+
+        <section class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+            <div class="bg-white border border-slate-200 rounded-2xl p-4">
+                <h2 class="font-semibold text-slate-900 mb-3">Pagal tikslą</h2>
+                <div id="tikslasStats" class="space-y-2 text-sm"></div>
+            </div>
+            <div class="bg-white border border-slate-200 rounded-2xl p-4">
+                <h2 class="font-semibold text-slate-900 mb-3">Pagal biudžetą (lygis)</h2>
+                <div id="lygisStats" class="space-y-2 text-sm"></div>
+            </div>
+        </section>
+
+        <section class="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+            <div class="px-4 py-3 border-b border-slate-100">
+                <h2 class="font-semibold text-slate-900">Visi įrašai</h2>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full text-sm">
+                    <thead class="bg-slate-50">
+                        <tr class="text-left text-slate-600">
+                            <th class="px-4 py-3 font-semibold">ID</th>
+                            <th class="px-4 py-3 font-semibold">Tikslas</th>
+                            <th class="px-4 py-3 font-semibold">Biudžetas</th>
+                            <th class="px-4 py-3 font-semibold">Terminas</th>
+                            <th class="px-4 py-3 font-semibold">Vardas</th>
+                            <th class="px-4 py-3 font-semibold">El. paštas</th>
+                            <th class="px-4 py-3 font-semibold">Laikas</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody" class="divide-y divide-slate-100 bg-white"></tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        const DEFAULT_WEBHOOK_GET_URL = "https://gedoauto.app.n8n.cloud/webhook/031b1605-c1ef-4a24-9028-55e792adf3cd";
+
+        const statusBox = document.getElementById("statusBox");
+        const webhookUrlInput = document.getElementById("webhookUrl");
+        webhookUrlInput.value = DEFAULT_WEBHOOK_GET_URL;
+        localStorage.setItem("n8n_stats_webhook_url", DEFAULT_WEBHOOK_GET_URL);
+        const refreshBtn = document.getElementById("refreshBtn");
+        const totalCount = document.getElementById("totalCount");
+        const uniqueTikslas = document.getElementById("uniqueTikslas");
+        const uniqueLygis = document.getElementById("uniqueLygis");
+        const lastUpdate = document.getElementById("lastUpdate");
+        const tikslasStats = document.getElementById("tikslasStats");
+        const lygisStats = document.getElementById("lygisStats");
+        const tableBody = document.getElementById("tableBody");
+
+        function pick(row, keys) {
+            for (const key of keys) {
+                const value = row?.[key];
+                if (value !== undefined && value !== null && String(value).trim() !== "") {
+                    return String(value).trim();
+                }
+            }
+            return "";
+        }
+
+        function extractList(raw) {
+            if (Array.isArray(raw)) return raw;
+            if (!raw || typeof raw !== "object") return [];
+
+            const candidates = ["data", "items", "rows", "results", "records", "body"];
+            for (const key of candidates) {
+                if (Array.isArray(raw[key])) return raw[key];
+            }
+
+            // Vienas įrašas kaip objektas (ne tuščias {})
+            const keys = Object.keys(raw);
+            if (keys.length && !candidates.some((k) => k in raw)) {
+                return [raw];
+            }
+            return [];
+        }
+
+        function normalizeRows(raw) {
+            const list = extractList(raw);
+
+            return list.map((item) => {
+                const row = item?.json && typeof item.json === "object"
+                    ? item.json
+                    : item?.body && typeof item.body === "object"
+                        ? item.body
+                        : item;
+
+                return {
+                    id: pick(row, ["id", "ID"]),
+                    tikslas: pick(row, ["tikslas", "Tikslas"]),
+                    lygis: pick(row, ["lygis", "Lygis", "Biudžetas (Lygis)", "Biudžetas (lygis)", "Biudzetas (Lygis)"]),
+                    daznumas: pick(row, ["daznumas", "Dažnumas", "Terminas (Dažnumas)", "Terminas (Daznumas)"]),
+                    vardas: pick(row, ["vardas", "Vardas", "name", "Name"]),
+                    elpastas: pick(row, ["elpastas", "El. paštas", "El. pastas", "email", "Email"]),
+                    timestamp: pick(row, ["timestamp", "laikas", "Laikas", "Timestamp"])
+                };
+            });
+        }
+
+        function isCorsOrNetworkError(error) {
+            return error instanceof TypeError || /failed to fetch|networkerror/i.test(String(error?.message || error));
+        }
+
+        function countBy(rows, key) {
+            return rows.reduce((acc, row) => {
+                const value = (row[key] || "Nenurodyta").toString();
+                acc[value] = (acc[value] || 0) + 1;
+                return acc;
+            }, {});
+        }
+
+        function renderCounts(container, counts) {
+            const entries = Object.entries(counts);
+            if (!entries.length) {
+                container.innerHTML = `<p class="text-slate-400">Nėra duomenų.</p>`;
+                return;
+            }
+            container.innerHTML = entries
+                .sort((a, b) => b[1] - a[1])
+                .map(([label, value]) => `
+                    <div class="flex items-center justify-between px-3 py-2 rounded-lg bg-slate-50">
+                        <span class="text-slate-700">${escapeHtml(label)}</span>
+                        <span class="font-semibold text-slate-900">${value}</span>
+                    </div>
+                `)
+                .join("");
+        }
+
+        function renderTable(rows) {
+            if (!rows.length) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="px-4 py-8 text-center text-slate-400">Įrašų kol kas nėra.</td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tableBody.innerHTML = rows
+                .map((row) => `
+                    <tr>
+                        <td class="px-4 py-3">${escapeHtml(row.id)}</td>
+                        <td class="px-4 py-3">${escapeHtml(row.tikslas)}</td>
+                        <td class="px-4 py-3">${escapeHtml(row.lygis)}</td>
+                        <td class="px-4 py-3">${escapeHtml(row.daznumas)}</td>
+                        <td class="px-4 py-3">${escapeHtml(row.vardas)}</td>
+                        <td class="px-4 py-3">${escapeHtml(row.elpastas)}</td>
+                        <td class="px-4 py-3">${escapeHtml(formatDate(row.timestamp))}</td>
+                    </tr>
+                `)
+                .join("");
+        }
+
+        function formatDate(value) {
+            if (!value) return "-";
+            const date = new Date(value);
+            return Number.isNaN(date.getTime()) ? value : date.toLocaleString("lt-LT");
+        }
+
+        function escapeHtml(value) {
+            return String(value)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#39;");
+        }
+
+        function renderEmptyState() {
+            totalCount.textContent = "0";
+            uniqueTikslas.textContent = "0";
+            uniqueLygis.textContent = "0";
+            lastUpdate.textContent = "-";
+            renderCounts(tikslasStats, {});
+            renderCounts(lygisStats, {});
+            renderTable([]);
+        }
+
+        function applyRows(rows) {
+            totalCount.textContent = rows.length;
+            uniqueTikslas.textContent = new Set(rows.map((r) => r.tikslas).filter(Boolean)).size;
+            uniqueLygis.textContent = new Set(rows.map((r) => r.lygis).filter(Boolean)).size;
+            lastUpdate.textContent = new Date().toLocaleString("lt-LT");
+            renderCounts(tikslasStats, countBy(rows, "tikslas"));
+            renderCounts(lygisStats, countBy(rows, "lygis"));
+            renderTable(rows);
+        }
+
+        async function loadStats() {
+            const webhookUrl = webhookUrlInput.value.trim();
+            if (!webhookUrl) {
+                statusBox.className = "mb-6 text-sm px-4 py-3 rounded-xl border border-rose-200 bg-rose-50 text-rose-700";
+                statusBox.textContent = "Įveskite webhook URL.";
+                return;
+            }
+
+            localStorage.setItem("n8n_stats_webhook_url", webhookUrl);
+            refreshBtn.disabled = true;
+            statusBox.className = "mb-6 text-sm px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-600";
+            statusBox.textContent = "Kraunami duomenys...";
+
+            try {
+                const response = await fetch(webhookUrl, {
+                    method: "GET",
+                    headers: { Accept: "application/json" }
+                });
+
+                const rawText = await response.text();
+                let json = {};
+                if (rawText.trim()) {
+                    try {
+                        json = JSON.parse(rawText);
+                    } catch {
+                        throw new Error("Webhook grąžino ne JSON formatą.");
+                    }
+                }
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${rawText.slice(0, 120)}`);
+                }
+
+                const rows = normalizeRows(json);
+                applyRows(rows);
+
+                if (!rows.length) {
+                    statusBox.className = "mb-6 text-sm px-4 py-3 rounded-xl border border-amber-200 bg-amber-50 text-amber-800";
+                    statusBox.textContent =
+                        "Webhook atsakė, bet įrašų nėra (gauta: " + (rawText || "{}") +
+                        "). n8n flow turi grąžinti Google Sheets eilutes kaip JSON masyvą per „Respond to Webhook“.";
+                    return;
+                }
+
+                statusBox.className = "mb-6 text-sm px-4 py-3 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700";
+                statusBox.textContent = `Duomenys sėkmingai atnaujinti (${rows.length} įraš.).`;
+            } catch (error) {
+                console.error(error);
+                renderEmptyState();
+
+                statusBox.className = "mb-6 text-sm px-4 py-3 rounded-xl border border-rose-200 bg-rose-50 text-rose-700";
+                if (isCorsOrNetworkError(error)) {
+                    statusBox.innerHTML =
+                        "<strong>CORS / tinklo klaida.</strong> Naršyklė blokuoja GET iš localhost. " +
+                        "n8n Webhook node: įjunkite <em>Allowed Origins: *</em>, naudokite Production URL " +
+                        "(<code>/webhook/</code>) ir aktyvų workflow.";
+                } else {
+                    statusBox.textContent = "Klaida: " + (error?.message || "nepavyko užkrauti duomenų.");
+                }
+            } finally {
+                refreshBtn.disabled = false;
+            }
+        }
+
+        webhookUrlInput.addEventListener("change", loadStats);
+        refreshBtn.addEventListener("click", loadStats);
+        loadStats();
+    </script>
+</body>
+</html>
