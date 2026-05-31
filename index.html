@@ -29,6 +29,13 @@
 
     <!-- Pagrindinis konteineris -->
     <div class="min-h-screen flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8">
+
+        <div class="w-full max-w-2xl mb-4 flex justify-end">
+            <a href="./statistika.html" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-sm font-semibold text-slate-700 transition-colors">
+                <i data-lucide="bar-chart-2" class="w-4 h-4 text-indigo-500"></i>
+                Statistika
+            </a>
+        </div>
         
         <!-- Viršutinis nustatymų blokas n8n webhook testavimui -->
         <div class="w-full max-w-2xl mb-6 bg-white rounded-2xl border border-slate-200/80 p-4 shadow-sm">
@@ -312,7 +319,7 @@
         const webhookUrlInput = document.getElementById("webhookUrl");
         const webhookStatus = document.getElementById("webhookStatus");
 
-        const DEFAULT_N8N_WEBHOOK_URL = "https://gedoauto.app.n8n.cloud/webhook-test/a7dea620-95f7-4741-9d7c-db5d956c9237";
+        const DEFAULT_N8N_WEBHOOK_URL = "https://gedoauto.app.n8n.cloud/webhook/031b1605-c1ef-4a24-9028-55e792adf3cd";
         let currentStep = 1;
         let selectedWebhookUrl = DEFAULT_N8N_WEBHOOK_URL;
         localStorage.setItem("n8n_webhook_url", DEFAULT_N8N_WEBHOOK_URL);
